@@ -24,6 +24,7 @@
 package xyz.jpenilla.minimotd.common;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
@@ -84,11 +85,12 @@ public final class MiniMOTD<I> {
 
     String iconString = null;
     if (config.motdEnabled()) {
-      if (config.motds().isEmpty()) {
+      final List<MOTDConfig.MOTD> activeMOTDs = config.resolveActiveMOTDs(this.logger());
+      if (activeMOTDs.isEmpty()) {
         throw new IllegalStateException("MOTD is enabled, but there are no MOTDs in the config file?");
       }
-      final int index = config.motds().size() == 1 ? 0 : ThreadLocalRandom.current().nextInt(config.motds().size());
-      final MOTDConfig.MOTD motdConfig = config.motds().get(index);
+      final int index = activeMOTDs.size() == 1 ? 0 : ThreadLocalRandom.current().nextInt(activeMOTDs.size());
+      final MOTDConfig.MOTD motdConfig = activeMOTDs.get(index);
       final Component motd = Component.textOfChildren(
         parse(motdConfig.line1(), count),
         newline(),

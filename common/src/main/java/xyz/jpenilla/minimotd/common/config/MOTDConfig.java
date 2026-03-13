@@ -23,10 +23,13 @@
  */
 package xyz.jpenilla.minimotd.common.config;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
 import org.spongepowered.configurate.objectmapping.ConfigSerializable;
 import org.spongepowered.configurate.objectmapping.meta.Comment;
 import xyz.jpenilla.minimotd.common.PingResponse;
@@ -52,6 +55,11 @@ public final class MOTDConfig {
     + " - Supported placeholders: <online_players>, <max_players>\n"
     + " - Putting more than one will cause one to be randomly chosen each refresh")
   private final List<MOTD> motds = new ArrayList<>();
+
+  @Comment("Scheduled periods where specific MOTDs are displayed.\n"
+    + "The first period matching the current date will be used.\n"
+    + "If no period is active, the default 'motds' list is used.")
+  private final List<ScheduledPeriod> scheduledPeriods = new ArrayList<>();
 
   @Comment("Enable MOTD-related features")
   private boolean motdEnabled = true;
@@ -92,6 +100,39 @@ public final class MOTDConfig {
 
     public @NonNull String icon() {
       return this.icon;
+    }
+
+  }
+
+  @ConfigSerializable
+  public static final class ScheduledPeriod {
+
+    @Comment("Optional description for this period (e.g. 'Christmas Event')")
+    private String description = "";
+
+    @Comment("Start date (inclusive) in ISO format: YYYY-MM-DD")
+    private String startDate = "2026-01-01";
+
+    @Comment("End date (inclusive) in ISO format: YYYY-MM-DD")
+    private String endDate = "2026-01-31";
+
+    @Comment("MOTDs to display during this period")
+    private final List<MOTD> motds = new ArrayList<>();
+
+    public @NonNull String description() {
+      return this.description;
+    }
+
+    public @NonNull String startDate() {
+      return this.startDate;
+    }
+
+    public @NonNull String endDate() {
+      return this.endDate;
+    }
+
+    public @NonNull List<MOTD> motds() {
+      return this.motds;
     }
 
   }
@@ -171,6 +212,24 @@ public final class MOTDConfig {
   }
 
   public @NonNull List<MOTD> motds() {
+    return this.motds;
+  }
+
+  public @NonNull List<MOTD> resolveActiveMOTDs(final @NonNull Logger logger) {
+    final LocalDate today = LocalDate.now();
+    for (final ScheduledPeriod period : this.scheduledPeriods) {
+      try {
+        final LocalDate start = LocalDate.parse(period.startDate());
+        final LocalDate end = LocalDate.parse(period.endDate());
+        if (!today.isBefore(start) && !today.isAfter(end)) {
+          if (!period.motds().isEmpty()) {
+            return period.motds();
+          }
+        }
+      } catch (final DateTimeParseException e) {
+        logger.warn("[MiniMOTD] Invalid date in scheduled period '{}': {}", period.description(), e.getMessage());
+      }
+    }
     return this.motds;
   }
 
